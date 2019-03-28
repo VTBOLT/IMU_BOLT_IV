@@ -3,7 +3,8 @@
 #define ENABLE_NVRAM_STORAGE true
 
 // Serial Port Config
-#define SERIAL_BAUD_RATE 115200
+#define SERIAL_BAUD_RATE 9600
+#define DEBUG_BAUD_RATE 115200
 #define DEBUG SERIAL_PORT_USBVIRTUAL // Equivalent to SerialUSB
 
 // User LED Config

@@ -21,11 +21,18 @@
 //    - NOTE: This board package requires the following URL to be entered in the "Additonal
 //      Boards Manager URLs" section ins File->Preferences->Additional Boards Manager URLs:
 //      https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_Manager/package_sparkfun_index.json
+// 
+// Important Notes:
+// - Sometimes (most of the time) the SAMD21 microcontroller will not enter the Arduino bootloader
+//   when trying to download firmware. To force the microcontroller into the bootloader, turn the
+//   power switch off, then short the SCL and GND pin with a jumper. With the pins shorted, turn on
+//   the board, then remove the jumper. A blue LED should begin to pulse slowly.
 
 
 // Included libraries
-#include <SparkFunMPU9250-DMP.h> // Include SparkFun MPU-9250 library
+#include <avr/dtostrf.h>
 #include <SD.h> // Manages file and hardware control on the SD storage
+#include <SparkFunMPU9250-DMP.h> // Include SparkFun MPU-9250 library
 #include "config.h"
 #if ENABLE_NVRAM_STORAGE
 #include <FlashStorage.h>
@@ -37,6 +44,10 @@
 #define MAG   'm'
 #define EULER 'e'
 #define COMPASS 'c'
+#define ACCEL_BUF_SZ 5
+#define GYRO_BUF_SZ 7
+#define ANGLE_BUF_SZ 9
+#define COMP_BUF_SZ 9
 
 // Type definitions
 typedef struct {
@@ -54,6 +65,7 @@ void initIMU();
 void initDMP();
 void dbgPrintData(imudata_t, imudata_t, imudata_t, eulerangle_t, float);
 void imuGetData(imudata_t*, imudata_t*, imudata_t*, eulerangle_t*, float*);
+void imuSendData(imudata_t, imudata_t, eulerangle_t, float);
 
 // Global variables
 MPU9250_DMP imu; // Create instance of the MPU9250_DMP class
@@ -88,6 +100,7 @@ void loop() {
 
   if (millis() > gNextBlink) {
     blinkLED();
+    imuSendData(accel, gyro, angle, compass);
     gNextBlink += UART_BLINK_RATE;
   }
 #if DEBUG_ENABLE
@@ -107,13 +120,16 @@ void blinkLED() {
 
 // Initialize hardware config
 void initHW() {
+  Serial1.begin(SERIAL_BAUD_RATE);
+  while (!Serial1); // Wait for serial connection to open
 #if DEBUG_ENABLE
-  DEBUG.begin(SERIAL_BAUD_RATE);
+  DEBUG.begin(DEBUG_BAUD_RATE);
 #endif
-  while (!DEBUG); // Wait for serial connection to open
+  while (!DEBUG);
 #if DEBUG_ENABLE
   DEBUG.println("Serial connection initialized");
-  DEBUG.println("USB Baud rate: " + String(SERIAL_BAUD_RATE));
+  DEBUG.println("USB Baud rate: " + String(DEBUG_BAUD_RATE));
+  DEBUG.println("Serial1 Baud rate: " + String(SERIAL_BAUD_RATE));
 #endif
   pinMode(HW_LED_PIN, OUTPUT);
   digitalWrite(HW_LED_PIN, LOW);
@@ -186,6 +202,56 @@ void imuGetData(imudata_t* accel, imudata_t* gyro, imudata_t* mag, eulerangle_t*
     angle->roll = imu.roll;
     angle->yaw = imu.yaw;
     *compass = imu.computeCompassHeading();
+}
+
+void imuSendData(imudata_t accel, imudata_t gyro, eulerangle_t angle, float compass)
+{
+  // Write all data out through UART pins to the TI microcontroller.
+  // Magnetometer data is not needed since we only care about the compass
+  // data.
+  char imubuf[12];
+
+  // All values are appended with an appreviation + '|' to allow the TI microcontroller
+  // to parse the data easily.
+  dtostrf(accel.x, 8, 4, imubuf);
+  memcpy(&imubuf[9], "ax|", 3);
+  DEBUG.write(imubuf, sizeof(imubuf));
+
+  dtostrf(accel.y, 8, 4, imubuf);
+  memcpy(&imubuf[9], "ay|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(accel.z, 8, 4, imubuf);
+  memcpy(&imubuf[9], "az|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(gyro.x, 8, 4, imubuf);
+  memcpy(&imubuf[9], "gx|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(gyro.y, 8, 4, imubuf);
+  memcpy(&imubuf[9], "gy|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(gyro.z, 8, 4, imubuf);
+  memcpy(&imubuf[9], "gz|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(angle.pitch, 8, 4, imubuf);
+  memcpy(&imubuf[9], "ep|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(angle.roll, 8, 4, imubuf);
+  memcpy(&imubuf[9], "er|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(angle.yaw, 8, 4, imubuf);
+  memcpy(&imubuf[9], "ez|", 3);
+  Serial1.write(imubuf, sizeof(imubuf));
+
+  dtostrf(compass, 8, 4, imubuf);
+  memcpy(&imubuf[9], "co|", 2);
+  Serial1.write(imubuf, sizeof(imubuf));
 }
 
 void dbgPrintData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t angle, float compass) {
