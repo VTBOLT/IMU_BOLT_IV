@@ -72,10 +72,27 @@ MPU9250_DMP imu; // Create instance of the MPU9250_DMP class
 uint32_t gNextBlink = 0;
 uint32_t gNextOutput = 0;
 
+/////////////////////
+// SD Card Globals //
+/////////////////////
+bool sdCardPresent = false; // Keeps track of if SD card is plugged in
+String logFileName; // Active logging file
+String logFileBuffer; // Buffer for logged data. Max is set in config
+
 void setup() {
   initHW(); // Config pins and serial connections
   initIMU(); // Config accel, gyro, mag, and interrupts
   initDMP(); // Config DMP
+
+  // "initSD()" needs to be created
+  // Check for the presence of an SD card, and initialize it:
+  if ( initSD() )
+  {
+    sdCardPresent = true;
+    // Get the next, available log file name
+    logFileName = nextLogFile(); 
+  }
+  
 }
 
 void loop() {
