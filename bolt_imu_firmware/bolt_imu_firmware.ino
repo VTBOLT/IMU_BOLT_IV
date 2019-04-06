@@ -100,7 +100,7 @@ void loop() {
 
   if (millis() > gNextBlink) {
     blinkLED();
-    imuSendData(accel, gyro, angle, compass);
+    //imuSendData(accel, gyro, angle, compass);
     gNextBlink += UART_BLINK_RATE;
   }
 #if DEBUG_ENABLE
@@ -124,9 +124,7 @@ void initHW() {
   while (!Serial1); // Wait for serial connection to open
 #if DEBUG_ENABLE
   DEBUG.begin(DEBUG_BAUD_RATE);
-#endif
   while (!DEBUG);
-#if DEBUG_ENABLE
   DEBUG.println("Serial connection initialized");
   DEBUG.println("USB Baud rate: " + String(DEBUG_BAUD_RATE));
   DEBUG.println("Serial1 Baud rate: " + String(SERIAL_BAUD_RATE));

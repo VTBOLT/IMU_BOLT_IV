@@ -24,5 +24,5 @@
 #define SD_CHIP_SELECT_PIN 38
 
 // Software Definitions
-#define DEBUG_ENABLE true // Set to false to disable debug statements through USB and it reduce program size
+#define DEBUG_ENABLE false // Set to false to disable debug statements through USB and it reduce program size
 #define DEBUG_OUTPUT_RATE 100 // Output data will be updated 100ms
