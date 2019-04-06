@@ -100,7 +100,7 @@ void loop() {
 
   if (millis() > gNextBlink) {
     blinkLED();
-    //imuSendData(accel, gyro, angle, compass);
+    //imuSendData(accel, gyro, angle, compass); // Debugging purposes
     gNextBlink += UART_BLINK_RATE;
   }
 #if DEBUG_ENABLE
@@ -213,7 +213,7 @@ void imuSendData(imudata_t accel, imudata_t gyro, eulerangle_t angle, float comp
   // to parse the data easily.
   dtostrf(accel.x, 8, 4, imubuf);
   memcpy(&imubuf[9], "ax|", 3);
-  DEBUG.write(imubuf, sizeof(imubuf));
+  Serial1.write(imubuf, sizeof(imubuf));
 
   dtostrf(accel.y, 8, 4, imubuf);
   memcpy(&imubuf[9], "ay|", 3);
