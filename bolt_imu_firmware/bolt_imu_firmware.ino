@@ -72,6 +72,24 @@ MPU9250_DMP imu; // Create instance of the MPU9250_DMP class
 uint32_t gNextBlink = 0;
 uint32_t gNextOutput = 0;
 
+/////////////////////////////
+// Logging Control Globals //
+/////////////////////////////
+// Defaults all set in config.h
+bool enableSDLogging = ENABLE_SD_LOGGING;
+bool enableSerialLogging = ENABLE_UART_LOGGING;
+bool enableTimeLog = ENABLE_TIME_LOG;
+bool enableCalculatedValues = ENABLE_CALCULATED_LOG;
+bool enableAccel = ENABLE_ACCEL_LOG;
+bool enableGyro = ENABLE_GYRO_LOG;
+bool enableCompass = ENABLE_MAG_LOG;
+bool enableQuat = ENABLE_QUAT_LOG;
+bool enableEuler = ENABLE_EULER_LOG;
+bool enableHeading = ENABLE_HEADING_LOG;
+unsigned short accelFSR = IMU_ACCEL_FSR;
+unsigned short gyroFSR = IMU_GYRO_FSR;
+unsigned short fifoRate = DMP_SAMPLE_RATE;
+
 /////////////////////
 // SD Card Globals //
 /////////////////////
@@ -126,6 +144,11 @@ void loop() {
     gNextOutput += DEBUG_OUTPUT_RATE;
   }
 #endif
+
+  // If logging (to either UART and SD card) is enabled
+  if ( enableSerialLogging || enableSDLogging)
+    logIMUData(); // Log new data
+
 }
 
 // Heartbeat
@@ -311,5 +334,172 @@ void dbgPrintData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t a
     default:
       DEBUG.println("Invalid command: " + cmd); // Should never get here
       break;
+  }
+}
+
+bool initSD(void)
+{
+  // SD.begin should return true if a valid SD card is present
+  if ( !SD.begin(SD_CHIP_SELECT_PIN) )
+  {
+    return false;
+  }
+
+  return true;
+}
+
+// Log a string to the SD card
+bool sdLogString(String toLog)
+{
+  // Open the current file name:
+  File logFile = SD.open(logFileName, FILE_WRITE);
+  
+  // If the file will get too big with this new string, create
+  // a new one, and open it.
+  if (logFile.size() > (SD_MAX_FILE_SIZE - toLog.length()))
+  {
+    logFileName = nextLogFile();
+    logFile = SD.open(logFileName, FILE_WRITE);
+  }
+
+  // If the log file opened properly, add the string to it.
+  if (logFile)
+  {
+    logFile.print(toLog);
+    logFile.close();
+
+    return true; // Return success
+  }
+
+  return false; // Return fail
+}
+
+// Find the next available log file. Or return a null string
+// if we've reached the maximum file limit.
+String nextLogFile(void)
+{
+  String filename;
+  int logIndex = 0;
+
+  for (int i = 0; i < LOG_FILE_INDEX_MAX; i++)
+  {
+    // Construct a file with PREFIX[Index].SUFFIX
+    filename = String(LOG_FILE_PREFIX);
+    filename += String(logIndex);
+    filename += ".";
+    filename += String(LOG_FILE_SUFFIX);
+    // If the file name doesn't exist, return it
+    if (!SD.exists(filename))
+    {
+      return filename;
+    }
+    // Otherwise increment the index, and try again
+    logIndex++;
+  }
+
+  return "";
+}
+
+void logIMUData(void)
+{
+  String imuLog = ""; // Create a fresh line to log
+  if (enableTimeLog) // If time logging is enabled
+  {
+    imuLog += String(imu.time) + ", "; // Add time to log string
+  }
+  if (enableAccel) // If accelerometer logging is enabled
+  {
+    if ( enableCalculatedValues ) // If in calculated mode
+    {
+      imuLog += String(imu.calcAccel(imu.ax)) + ", ";
+      imuLog += String(imu.calcAccel(imu.ay)) + ", ";
+      imuLog += String(imu.calcAccel(imu.az)) + ", ";
+    }
+    else
+    {
+      imuLog += String(imu.ax) + ", ";
+      imuLog += String(imu.ay) + ", ";
+      imuLog += String(imu.az) + ", ";
+    }
+  }
+  if (enableGyro) // If gyroscope logging is enabled
+  {
+    if ( enableCalculatedValues ) // If in calculated mode
+    {
+      imuLog += String(imu.calcGyro(imu.gx)) + ", ";
+      imuLog += String(imu.calcGyro(imu.gy)) + ", ";
+      imuLog += String(imu.calcGyro(imu.gz)) + ", ";
+    }
+    else
+    {
+      imuLog += String(imu.gx) + ", ";
+      imuLog += String(imu.gy) + ", ";
+      imuLog += String(imu.gz) + ", ";
+    }
+  }
+  if (enableCompass) // If magnetometer logging is enabled
+  {
+    if ( enableCalculatedValues ) // If in calculated mode
+    {
+      imuLog += String(imu.calcMag(imu.mx)) + ", ";
+      imuLog += String(imu.calcMag(imu.my)) + ", ";
+      imuLog += String(imu.calcMag(imu.mz)) + ", ";    
+    }
+    else
+    {
+      imuLog += String(imu.mx) + ", ";
+      imuLog += String(imu.my) + ", ";
+      imuLog += String(imu.mz) + ", ";
+    }
+  }
+  if (enableQuat) // If quaternion logging is enabled
+  {
+    if ( enableCalculatedValues )
+    {
+      imuLog += String(imu.calcQuat(imu.qw), 4) + ", ";
+      imuLog += String(imu.calcQuat(imu.qx), 4) + ", ";
+      imuLog += String(imu.calcQuat(imu.qy), 4) + ", ";
+      imuLog += String(imu.calcQuat(imu.qz), 4) + ", ";
+    }
+    else
+    {
+      imuLog += String(imu.qw) + ", ";
+      imuLog += String(imu.qx) + ", ";
+      imuLog += String(imu.qy) + ", ";
+      imuLog += String(imu.qz) + ", ";      
+    }
+  }
+  if (enableEuler) // If Euler-angle logging is enabled
+  {
+    imu.computeEulerAngles();
+    imuLog += String(imu.pitch, 2) + ", ";
+    imuLog += String(imu.roll, 2) + ", ";
+    imuLog += String(imu.yaw, 2) + ", ";
+  }
+  if (enableHeading) // If heading logging is enabled
+  {
+    imuLog += String(imu.computeCompassHeading(), 2) + ", ";
+  }
+  
+  // Remove last comma/space:
+  imuLog.remove(imuLog.length() - 2, 2);
+  imuLog += "\r\n"; // Add a new line
+
+  if (enableSerialLogging)  // If serial port logging is enabled
+    LOG_PORT.print(imuLog); // Print log line to serial port
+
+  // If SD card logging is enabled & a card is plugged in
+  if ( sdCardPresent && enableSDLogging)
+  {
+    // If adding this log line will put us over the buffer length:
+    if (imuLog.length() + logFileBuffer.length() >=
+        SD_LOG_WRITE_BUFFER_SIZE)
+    {
+      sdLogString(logFileBuffer); // Log SD buffer
+      logFileBuffer = ""; // Clear SD log buffer 
+      blinkLED(); // Blink LED every time a new buffer is logged to SD
+    }
+    // Add new line to SD log buffer
+    logFileBuffer += imuLog;
   }
 }
