@@ -1,15 +1,3 @@
-////////////////////////////////
-// Default Logging Parameters //
-////////////////////////////////
-#define ENABLE_TIME_LOG       true
-#define ENABLE_CALCULATED_LOG true
-#define ENABLE_ACCEL_LOG      true
-#define ENABLE_GYRO_LOG       true
-#define ENABLE_MAG_LOG        true
-#define ENABLE_QUAT_LOG       false
-#define ENABLE_EULER_LOG      false
-#define ENABLE_HEADING_LOG    false
-
 // Enable Non-Volatile Memory Storage
 // If defined, the FlashStorage library must be installed
 #define ENABLE_NVRAM_STORAGE true
@@ -18,15 +6,6 @@
 #define SERIAL_BAUD_RATE 9600
 #define DEBUG_BAUD_RATE 115200
 #define DEBUG SERIAL_PORT_USBVIRTUAL // Equivalent to SerialUSB
-
-////////////////////////
-// Serial Port Config //
-////////////////////////
-#define ENABLE_UART_LOGGING true
-// Select the Serial port to log to. Either SERIAL_PORT_USBVIRTUAL
-// or LOG_PORT SERIAL_PORT_HARDWARE (SerialUSB or Serial1)
-#define LOG_PORT SERIAL_PORT_USBVIRTUAL
-
 
 // User LED Config
 #define HW_LED_PIN 13
@@ -48,12 +27,9 @@
 #define DEBUG_ENABLE true // Set to false to disable debug statements through USB and it reduce program size
 #define DEBUG_OUTPUT_RATE 100 // Output data will be updated 100ms
 
-///////////////////////
-// SD Logging Config //
-///////////////////////
-#define ENABLE_SD_LOGGING true // Default SD logging (can be changed via serial menu)
+// SD Logging Config
 #define LOG_FILE_INDEX_MAX 999 // Max number of "logXXX.txt" files
 #define LOG_FILE_PREFIX "log"  // Prefix name for log files
-#define LOG_FILE_SUFFIX "txt"  // Suffix name for log files
+#define LOG_FILE_SUFFIX "csv"  // Suffix name for log files
 #define SD_MAX_FILE_SIZE 5000000 // 5MB max file size, increment to next file before surpassing
 #define SD_LOG_WRITE_BUFFER_SIZE 1024 // Experimentally tested to produce 100Hz logs

@@ -66,33 +66,17 @@ void initDMP();
 void dbgPrintData(imudata_t, imudata_t, imudata_t, eulerangle_t, float);
 void imuGetData(imudata_t*, imudata_t*, imudata_t*, eulerangle_t*, float*);
 void imuSendData(imudata_t, imudata_t, eulerangle_t, float);
+bool initSD(void);
+bool sdLogString(String toLog);
+String nextLogFile(void);
+void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t angle, float compass);
 
 // Global variables
 MPU9250_DMP imu; // Create instance of the MPU9250_DMP class
 uint32_t gNextBlink = 0;
 uint32_t gNextOutput = 0;
 
-/////////////////////////////
-// Logging Control Globals //
-/////////////////////////////
-// Defaults all set in config.h
-bool enableSDLogging = ENABLE_SD_LOGGING;
-bool enableSerialLogging = ENABLE_UART_LOGGING;
-bool enableTimeLog = ENABLE_TIME_LOG;
-bool enableCalculatedValues = ENABLE_CALCULATED_LOG;
-bool enableAccel = ENABLE_ACCEL_LOG;
-bool enableGyro = ENABLE_GYRO_LOG;
-bool enableCompass = ENABLE_MAG_LOG;
-bool enableQuat = ENABLE_QUAT_LOG;
-bool enableEuler = ENABLE_EULER_LOG;
-bool enableHeading = ENABLE_HEADING_LOG;
-unsigned short accelFSR = IMU_ACCEL_FSR;
-unsigned short gyroFSR = IMU_GYRO_FSR;
-unsigned short fifoRate = DMP_SAMPLE_RATE;
-
-/////////////////////
-// SD Card Globals //
-/////////////////////
+// SD Card Globals 
 bool sdCardPresent = false; // Keeps track of if SD card is plugged in
 String logFileName; // Active logging file
 String logFileBuffer; // Buffer for logged data. Max is set in config
@@ -145,9 +129,7 @@ void loop() {
   }
 #endif
 
-  // If logging (to either UART and SD card) is enabled
-  if ( enableSerialLogging || enableSDLogging)
-    logIMUData(); // Log new data
+    logIMUData(accel, gyro, mag, angle, compass); // Log new data
 
 }
 
@@ -400,96 +382,33 @@ String nextLogFile(void)
   return "";
 }
 
-void logIMUData(void)
+void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t angle, float compass)
 {
   String imuLog = ""; // Create a fresh line to log
-  if (enableTimeLog) // If time logging is enabled
-  {
-    imuLog += String(imu.time) + ", "; // Add time to log string
-  }
-  if (enableAccel) // If accelerometer logging is enabled
-  {
-    if ( enableCalculatedValues ) // If in calculated mode
-    {
-      imuLog += String(imu.calcAccel(imu.ax)) + ", ";
-      imuLog += String(imu.calcAccel(imu.ay)) + ", ";
-      imuLog += String(imu.calcAccel(imu.az)) + ", ";
-    }
-    else
-    {
-      imuLog += String(imu.ax) + ", ";
-      imuLog += String(imu.ay) + ", ";
-      imuLog += String(imu.az) + ", ";
-    }
-  }
-  if (enableGyro) // If gyroscope logging is enabled
-  {
-    if ( enableCalculatedValues ) // If in calculated mode
-    {
-      imuLog += String(imu.calcGyro(imu.gx)) + ", ";
-      imuLog += String(imu.calcGyro(imu.gy)) + ", ";
-      imuLog += String(imu.calcGyro(imu.gz)) + ", ";
-    }
-    else
-    {
-      imuLog += String(imu.gx) + ", ";
-      imuLog += String(imu.gy) + ", ";
-      imuLog += String(imu.gz) + ", ";
-    }
-  }
-  if (enableCompass) // If magnetometer logging is enabled
-  {
-    if ( enableCalculatedValues ) // If in calculated mode
-    {
-      imuLog += String(imu.calcMag(imu.mx)) + ", ";
-      imuLog += String(imu.calcMag(imu.my)) + ", ";
-      imuLog += String(imu.calcMag(imu.mz)) + ", ";    
-    }
-    else
-    {
-      imuLog += String(imu.mx) + ", ";
-      imuLog += String(imu.my) + ", ";
-      imuLog += String(imu.mz) + ", ";
-    }
-  }
-  if (enableQuat) // If quaternion logging is enabled
-  {
-    if ( enableCalculatedValues )
-    {
-      imuLog += String(imu.calcQuat(imu.qw), 4) + ", ";
-      imuLog += String(imu.calcQuat(imu.qx), 4) + ", ";
-      imuLog += String(imu.calcQuat(imu.qy), 4) + ", ";
-      imuLog += String(imu.calcQuat(imu.qz), 4) + ", ";
-    }
-    else
-    {
-      imuLog += String(imu.qw) + ", ";
-      imuLog += String(imu.qx) + ", ";
-      imuLog += String(imu.qy) + ", ";
-      imuLog += String(imu.qz) + ", ";      
-    }
-  }
-  if (enableEuler) // If Euler-angle logging is enabled
-  {
-    imu.computeEulerAngles();
-    imuLog += String(imu.pitch, 2) + ", ";
-    imuLog += String(imu.roll, 2) + ", ";
-    imuLog += String(imu.yaw, 2) + ", ";
-  }
-  if (enableHeading) // If heading logging is enabled
-  {
-    imuLog += String(imu.computeCompassHeading(), 2) + ", ";
-  }
   
-  // Remove last comma/space:
-  imuLog.remove(imuLog.length() - 2, 2);
-  imuLog += "\r\n"; // Add a new line
+  // If time logging
+    imuLog += String(imu.time) + ", "; // Add time to log string
+    
+  // If accelerometer logging
+      imuLog += String(accel.x) + ", ";
+      imuLog += String(accel.y) + ", ";
+      imuLog += String(accel.z) + ", ";
+ 
+  // If gyroscope logging is enabled
+      imuLog += String(gyro.x) + ", ";
+      imuLog += String(gyro.y) + ", ";
+      imuLog += String(gyro.z) + ", "; 
+      
+  // If Euler-angle logging is enabled
+    imuLog += String(angle.roll) + ", ";
+    imuLog += String(angle.pitch) + ", ";
+    imuLog += String(angle.yaw) + ", ";
 
-  if (enableSerialLogging)  // If serial port logging is enabled
-    LOG_PORT.print(imuLog); // Print log line to serial port
+  // If heading logging is enabled
+    imuLog += String(compass) + "\r\n";
 
   // If SD card logging is enabled & a card is plugged in
-  if ( sdCardPresent && enableSDLogging)
+  if ( sdCardPresent)
   {
     // If adding this log line will put us over the buffer length:
     if (imuLog.length() + logFileBuffer.length() >=
