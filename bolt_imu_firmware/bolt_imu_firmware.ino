@@ -66,6 +66,10 @@ void initDMP();
 void dbgPrintData(imudata_t, imudata_t, imudata_t, eulerangle_t, float);
 void imuGetData(imudata_t*, imudata_t*, imudata_t*, eulerangle_t*, float*);
 void imuSendData(imudata_t, imudata_t, eulerangle_t, float);
+bool initSD(void);
+bool sdLogString(String toLog);
+String nextLogFile(void);
+void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t angle, float compass);
 
 // Global variables
 MPU9250_DMP imu; // Create instance of the MPU9250_DMP class
@@ -73,10 +77,25 @@ uint32_t gNextBlink = 0;
 uint32_t gNextOutput = 0;
 uint32_t gNextTransmit = 0;
 
+// SD Card Globals 
+bool sdCardPresent = false; // Keeps track of if SD card is plugged in
+String logFileName; // Active logging file
+String logFileBuffer; // Buffer for logged data. Max is set in config
+
 void setup() {
   initHW(); // Config pins and serial connections
   initIMU(); // Config accel, gyro, mag, and interrupts
   initDMP(); // Config DMP
+
+  // "initSD()" needs to be created
+  // Check for the presence of an SD card, and initialize it:
+  if ( initSD() )
+  {
+    sdCardPresent = true;
+    // Get the next, available log file name
+    logFileName = nextLogFile(); 
+  }
+  
 }
 
 void loop() {
@@ -116,6 +135,9 @@ void loop() {
     gNextOutput += DEBUG_OUTPUT_RATE;
   }
 #endif
+
+    logIMUData(accel, gyro, mag, angle, compass); // Log new data
+
 }
 
 // Heartbeat
@@ -337,5 +359,109 @@ void dbgPrintData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t a
     default:
       DEBUG.println("Invalid command: " + cmd); // Should never get here
       break;
+  }
+}
+
+bool initSD(void)
+{
+  // SD.begin should return true if a valid SD card is present
+  if ( !SD.begin(SD_CHIP_SELECT_PIN) )
+  {
+    return false;
+  }
+
+  return true;
+}
+
+// Log a string to the SD card
+bool sdLogString(String toLog)
+{
+  // Open the current file name:
+  File logFile = SD.open(logFileName, FILE_WRITE);
+  
+  // If the file will get too big with this new string, create
+  // a new one, and open it.
+  if (logFile.size() > (SD_MAX_FILE_SIZE - toLog.length()))
+  {
+    logFileName = nextLogFile();
+    logFile = SD.open(logFileName, FILE_WRITE);
+  }
+
+  // If the log file opened properly, add the string to it.
+  if (logFile)
+  {
+    logFile.print(toLog);
+    logFile.close();
+
+    return true; // Return success
+  }
+
+  return false; // Return fail
+}
+
+// Find the next available log file. Or return a null string
+// if we've reached the maximum file limit.
+String nextLogFile(void)
+{
+  String filename;
+  int logIndex = 0;
+
+  for (int i = 0; i < LOG_FILE_INDEX_MAX; i++)
+  {
+    // Construct a file with PREFIX[Index].SUFFIX
+    filename = String(LOG_FILE_PREFIX);
+    filename += String(logIndex);
+    filename += ".";
+    filename += String(LOG_FILE_SUFFIX);
+    // If the file name doesn't exist, return it
+    if (!SD.exists(filename))
+    {
+      return filename;
+    }
+    // Otherwise increment the index, and try again
+    logIndex++;
+  }
+
+  return "";
+}
+
+void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t angle, float compass)
+{
+  String imuLog = ""; // Create a fresh line to log
+  
+  // If time logging
+    imuLog += String(imu.time) + ", "; // Add time to log string
+    
+  // If accelerometer logging
+      imuLog += String(accel.x) + ", ";
+      imuLog += String(accel.y) + ", ";
+      imuLog += String(accel.z) + ", ";
+ 
+  // If gyroscope logging is enabled
+      imuLog += String(gyro.x) + ", ";
+      imuLog += String(gyro.y) + ", ";
+      imuLog += String(gyro.z) + ", "; 
+      
+  // If Euler-angle logging is enabled
+    imuLog += String(angle.roll) + ", ";
+    imuLog += String(angle.pitch) + ", ";
+    imuLog += String(angle.yaw) + ", ";
+
+  // If heading logging is enabled
+    imuLog += String(compass) + "\r\n";
+
+  // If SD card logging is enabled & a card is plugged in
+  if ( sdCardPresent)
+  {
+    // If adding this log line will put us over the buffer length:
+    if (imuLog.length() + logFileBuffer.length() >=
+        SD_LOG_WRITE_BUFFER_SIZE)
+    {
+      sdLogString(logFileBuffer); // Log SD buffer
+      logFileBuffer = ""; // Clear SD log buffer 
+      blinkLED(); // Blink LED every time a new buffer is logged to SD
+    }
+    // Add new line to SD log buffer
+    logFileBuffer += imuLog;
   }
 }
