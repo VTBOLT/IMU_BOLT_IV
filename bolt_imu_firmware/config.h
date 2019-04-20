@@ -3,9 +3,10 @@
 #define ENABLE_NVRAM_STORAGE true
 
 // Serial Port Config
-#define SERIAL_BAUD_RATE 9600
-#define DEBUG_BAUD_RATE 115200
-#define DEBUG SERIAL_PORT_USBVIRTUAL // Equivalent to SerialUSB
+#define SERIAL_BAUD_RATE 57600
+#define DEBUG_BAUD_RATE 57600
+#define DEBUG SERIAL_PORT_USBVIRTUAL // Use USB Serial Port
+#define HW_SERIAL SERIAL_PORT_HARDWARE // Use TX RX pins on PCB
 
 // User LED Config
 #define HW_LED_PIN 13
@@ -26,3 +27,4 @@
 // Software Definitions
 #define DEBUG_ENABLE false // Set to false to disable debug statements through USB and it reduce program size
 #define DEBUG_OUTPUT_RATE 100 // Output data will be updated 100ms
+#define TRANSMIT_OUTPUT_INCREMENT 10 // Data will be output every 100ms

@@ -71,6 +71,7 @@ void imuSendData(imudata_t, imudata_t, eulerangle_t, float);
 MPU9250_DMP imu; // Create instance of the MPU9250_DMP class
 uint32_t gNextBlink = 0;
 uint32_t gNextOutput = 0;
+uint32_t gNextTransmit = 0;
 
 void setup() {
   initHW(); // Config pins and serial connections
@@ -100,9 +101,15 @@ void loop() {
 
   if (millis() > gNextBlink) {
     blinkLED();
-    //imuSendData(accel, gyro, angle, compass); // Debugging purposes
+    imuSendData(accel, gyro, angle, compass);
     gNextBlink += UART_BLINK_RATE;
   }
+
+  if (millis() > gNextTransmit) {
+    imuSendData(accel, gyro, angle, compass);
+    gNextTransmit += TRANSMIT_OUTPUT_INCREMENT;
+  }
+  
 #if DEBUG_ENABLE
   if (millis() > gNextOutput) {
     dbgPrintData(accel, gyro, mag, angle, compass);
@@ -120,14 +127,14 @@ void blinkLED() {
 
 // Initialize hardware config
 void initHW() {
-  Serial1.begin(SERIAL_BAUD_RATE);
-  while (!Serial1); // Wait for serial connection to open
+  HW_SERIAL.begin(SERIAL_BAUD_RATE, SERIAL_8N1); // Parity none, 1 stop bit
+  while (!HW_SERIAL); // Wait for serial connection to open
 #if DEBUG_ENABLE
-  DEBUG.begin(DEBUG_BAUD_RATE);
+  DEBUG.begin(DEBUG_BAUD_RATE, SERIAL_8N1); // Parity none, 1 stop bit
   while (!DEBUG);
   DEBUG.println("Serial connection initialized");
   DEBUG.println("USB Baud rate: " + String(DEBUG_BAUD_RATE));
-  DEBUG.println("Serial1 Baud rate: " + String(SERIAL_BAUD_RATE));
+  DEBUG.println("HW_SERIAL Baud rate: " + String(SERIAL_BAUD_RATE));
 #endif
   pinMode(HW_LED_PIN, OUTPUT);
   digitalWrite(HW_LED_PIN, LOW);
@@ -207,49 +214,85 @@ void imuSendData(imudata_t accel, imudata_t gyro, eulerangle_t angle, float comp
   // Write all data out through UART pins to the TI microcontroller.
   // Magnetometer data is not needed since we only care about the compass
   // data.
+  enum {AX, AY, AZ, GX, GY, GZ, EP, ER, EY, CO};
+  static int state = AX;
   char imubuf[12];
 
   // All values are appended with an appreviation + '|' to allow the TI microcontroller
   // to parse the data easily.
-  dtostrf(accel.x, 8, 4, imubuf);
-  memcpy(&imubuf[9], "ax|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
 
-  dtostrf(accel.y, 8, 4, imubuf);
-  memcpy(&imubuf[9], "ay|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+  switch(state)
+  {
+    case AX:
+      dtostrf(accel.x, 8, 4, imubuf);
+      memcpy(&imubuf[9], "ax", 3);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = AY;
+      break;
 
-  dtostrf(accel.z, 8, 4, imubuf);
-  memcpy(&imubuf[9], "az|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case AY:
+      dtostrf(accel.y, 8, 4, imubuf);
+      memcpy(&imubuf[9], "ay", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = AZ;
+      break;
 
-  dtostrf(gyro.x, 8, 4, imubuf);
-  memcpy(&imubuf[9], "gx|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case AZ:
+      dtostrf(accel.z, 8, 4, imubuf);
+      memcpy(&imubuf[9], "az", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = GX;
+      break;
 
-  dtostrf(gyro.y, 8, 4, imubuf);
-  memcpy(&imubuf[9], "gy|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case GX:
+      dtostrf(gyro.x, 8, 4, imubuf);
+      memcpy(&imubuf[9], "gx", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = GY;
+      break;
 
-  dtostrf(gyro.z, 8, 4, imubuf);
-  memcpy(&imubuf[9], "gz|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case GY:
+      dtostrf(gyro.y, 8, 4, imubuf);
+      memcpy(&imubuf[9], "gy", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = GZ;
+      break;
 
-  dtostrf(angle.pitch, 8, 4, imubuf);
-  memcpy(&imubuf[9], "ep|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case GZ:
+      dtostrf(gyro.z, 8, 4, imubuf);
+      memcpy(&imubuf[9], "gz", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = EP;
+      break;
 
-  dtostrf(angle.roll, 8, 4, imubuf);
-  memcpy(&imubuf[9], "er|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case EP:
+      dtostrf(angle.pitch, 8, 4, imubuf);
+      memcpy(&imubuf[9], "ep", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = ER;
+      break;
 
-  dtostrf(angle.yaw, 8, 4, imubuf);
-  memcpy(&imubuf[9], "ez|", 3);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case ER:
+      dtostrf(angle.roll, 8, 4, imubuf);
+      memcpy(&imubuf[9], "er", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = EY;
+      break;
 
-  dtostrf(compass, 8, 4, imubuf);
-  memcpy(&imubuf[9], "co|", 2);
-  Serial1.write(imubuf, sizeof(imubuf));
+    case EY:
+      dtostrf(angle.yaw, 8, 4, imubuf);
+      memcpy(&imubuf[9], "ey", 2);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = CO;
+      break;
+
+    case CO:
+      dtostrf(compass, 8, 4, imubuf);
+      memcpy(&imubuf[9], "c", 1);
+      HW_SERIAL.write(imubuf, sizeof(imubuf));
+      state = AX;
+      break;
+  }
 }
 
 void dbgPrintData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t angle, float compass) {
