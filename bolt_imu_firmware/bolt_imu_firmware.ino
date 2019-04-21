@@ -1,4 +1,5 @@
 // Author:      Logan Richardson
+//              Patrick Graybeal
 //
 // Filename:    bolt_firmware_imu.ino
 //
@@ -137,7 +138,6 @@ void loop() {
 #endif
 
     logIMUData(accel, gyro, mag, angle, compass); // Log new data
-
 }
 
 // Heartbeat
@@ -458,8 +458,7 @@ void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t ang
         SD_LOG_WRITE_BUFFER_SIZE)
     {
       sdLogString(logFileBuffer); // Log SD buffer
-      logFileBuffer = ""; // Clear SD log buffer 
-      blinkLED(); // Blink LED every time a new buffer is logged to SD
+      logFileBuffer = ""; // Clear SD log buffer
     }
     // Add new line to SD log buffer
     logFileBuffer += imuLog;
