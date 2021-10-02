@@ -75,6 +75,7 @@ bool initSD(void);
 bool sdLogString(String toLog);
 String nextLogFile(void);
 void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t angle, float compass);
+void calibrate(void);
 
 // Global variables
 MPU9250_DMP imu; // Create instance of the MPU9250_DMP class
@@ -101,6 +102,8 @@ void setup()
     // Get the next, available log file name
     logFileName = nextLogFile();
   }
+  
+  calibrate(); // Calibrate sensors
 }
 
 void loop()
@@ -513,4 +516,12 @@ void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t ang
     // Add new line to SD log buffer
     logFileBuffer += imuLog;
   }
+}
+
+  // Calibrate the gyroscope and accelerometer
+  // Calls the python script "mpu9250_full_calibration.py"
+void calibrate(void)
+{
+  std::string command = "python3 ./mpu9250_full_calibration.py";
+  system(command.c_str());
 }
