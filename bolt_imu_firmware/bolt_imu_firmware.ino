@@ -518,8 +518,8 @@ void logIMUData(imudata_t accel, imudata_t gyro, imudata_t mag, eulerangle_t ang
   }
 }
 
-  // Calibrate the gyroscope and accelerometer
-  // Calls the python script "mpu9250_full_calibration.py"
+// Calibrate the gyroscope and accelerometer
+// Calls the python script "mpu9250_full_calibration.py"
 void calibrate(void)
 {
   std::string command = "python3 ./mpu9250_full_calibration.py";
